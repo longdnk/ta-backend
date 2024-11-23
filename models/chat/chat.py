@@ -11,6 +11,7 @@ from sqlalchemy.sql import expression
 from database.database import Base
 from pydantic import BaseModel
 from datetime import datetime
+from sqlalchemy.orm import relationship
 
 
 class Chat(Base):
@@ -18,7 +19,9 @@ class Chat(Base):
 
     id = Column(String(255), primary_key=True, index=True)
     title = Column(String(255), nullable=False)  # Không NULL
-    chunks = Column(JSON, nullable=False, default=expression.literal_column("[]"))  # Mảng JSON trống mặc định
+    chunks = Column(
+        JSON, nullable=False, default=expression.literal_column("[]")
+    )  # Mảng JSON trống mặc định
     user_id = Column(String(255), nullable=False)  # Trường user_id bắt buộc
     is_deleted = Column(Boolean, default=False)  # Mặc định là False
     created_at = Column(
@@ -27,8 +30,10 @@ class Chat(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    user = relationship("User", back_populates="chats")
 
-class ChatEntity(BaseModel):
+
+class ChatEntity(BaseModel):  # Relationship to User model
     title: str
     chunks: list = []  # Dữ liệu dạng JSON
     user_id: str

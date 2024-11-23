@@ -42,11 +42,14 @@ class User(Base):
 
     # Quan hệ với bảng Role
     role = relationship("Role", backref="users", foreign_keys=[role_id])
-
+    
     # Quan hệ với bảng Prompt
     default_prompt_item = relationship(
         "Prompt", backref="users", foreign_keys=[default_prompt]
     )
+    
+    # One-to-many relationship with Chat model
+    chats = relationship("Chat", backref="user", lazy="dynamic")
 
     __table_args__ = (
         CheckConstraint(
