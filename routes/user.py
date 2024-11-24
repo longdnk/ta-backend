@@ -1,5 +1,5 @@
 from fastapi import APIRouter, status, HTTPException, Request
-from models.user.user import User, UserEntity, UserUpdate
+from models.user.user import User, UserEntity, UserUpdate 
 from response.response_item import response
 from database.database import db_dependency
 from fastapi.responses import FileResponse
@@ -35,11 +35,20 @@ async def get_users(
             data=[],
         )
 
+    users_data = [
+        {
+            key: value
+            for key, value in user.__dict__.items()
+            if key != "password" and not key.startswith("_")
+        }
+        for user in users
+    ]
+
     return response(
         code=status.HTTP_200_OK,
         message="OK",
         type="info",
-        data=users[skip : skip + limit],
+        data=users_data[skip : skip + limit],
     )
 
 
@@ -119,7 +128,9 @@ async def create_user(request: Request, user_entity: UserEntity, db: db_dependen
         new_user = User(**user_entity.dict())
         new_user.id = str(uuid4())
         new_user.password = encrypt.encrypt_password(new_user.password)
-        new_user.token = create_jwt_token(new_user.id, new_user.user_name, new_user.email)
+        new_user.token = create_jwt_token(
+            new_user.id, new_user.user_name, new_user.email
+        )
         db.add(new_user)
         db.commit()
 
@@ -162,7 +173,6 @@ async def get_user(user_id: str, db: db_dependency):
             type="error",
             data={"error": "Cannot find user"},
         )
-
     return response(
         code=status.HTTP_200_OK,
         message="OK",

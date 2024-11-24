@@ -70,7 +70,49 @@ async def login_user(request: Request, login_info: Auth, db: db_dependency):
                 "chat_ids": user.chat_ids,
                 "prompt_ids": user.prompt_ids,
                 "default_prompt": user.default_prompt,
-                "role": user.role
+                "role": user.role,
+            }
+        },
+    )
+
+
+@auth_router.get("/valid-token", status_code=status.HTTP_200_OK)
+async def verify_token(request: Request, db: db_dependency):
+    """
+    Kiểm tra token có tồn tại trong DB hay không.
+    """
+    # Step 1: Lấy token từ header
+    authorization: str = request.headers.get("Authorization")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing or invalid Authorization header",
+        )
+
+    token = authorization.replace("Bearer ", "")  # Tách lấy phần token
+
+    # Step 2: Kiểm tra token trong DB
+    user: User = (
+        db.query(User).filter(User.token == token, User.is_deleted == false).first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Token not found in database",
+        )
+
+    # Step 3: Trả kết quả
+    return response(
+        code=status.HTTP_200_OK,
+        message="Token is valid",
+        type="info",
+        data={
+            "user": {
+                "id": user.id,
+                "user_name": user.user_name,
+                "email": user.email,
+                "role": user.role,
             }
         },
     )

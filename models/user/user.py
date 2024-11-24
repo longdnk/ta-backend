@@ -48,9 +48,6 @@ class User(Base):
         "Prompt", backref="users", foreign_keys=[default_prompt]
     )
     
-    # One-to-many relationship with Chat model
-    chats = relationship("Chat", backref="user", lazy="dynamic")
-
     __table_args__ = (
         CheckConstraint(
             "email <> ''", name="check_email_not_empty"
@@ -73,9 +70,6 @@ class UserEntity(BaseModel):
     role_id: Optional[str] = None
     is_deleted: bool = False
 
-    class Config:
-        orm_mode = True
-
 class UserUpdate(BaseModel):
     user_name: str
     email: str
@@ -87,5 +81,3 @@ class UserUpdate(BaseModel):
     role_id: Optional[str] = None
     is_deleted: bool = False
 
-    class Config:
-        orm_mode = True
