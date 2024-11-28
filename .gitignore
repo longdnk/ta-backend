@@ -8,3 +8,4 @@ models/role/__pycache__
 models/user/__pycache__
 response/__pycache__
 routes/__pycache__
+.env

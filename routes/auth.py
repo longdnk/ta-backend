@@ -6,11 +6,11 @@ from helper.encrypt import encrypt_password
 from models.user.user import User
 from pydantic import BaseModel
 from datetime import datetime
-
+import time
 
 # Pydantic model for login payload
 class Auth(BaseModel):
-    identifier: str
+    info: str
     password: str
 
 
@@ -27,13 +27,15 @@ async def login_user(request: Request, login_info: Auth, db: db_dependency):
         db.query(User)
         .filter(
             (
-                (User.email == login_info.identifier)
-                | (User.user_name == login_info.identifier)
+                (User.email == login_info.info)
+                | (User.user_name == login_info.info)
             )  # Kiểm tra nếu email hoặc username trùng khớp
             & (User.is_deleted == False)  # Kiểm tra không bị xóa
         )
         .first()
     )
+
+    time.sleep(1)
 
     # Step 2: Kiểm tra xem user có tồn tại không
     if not user:

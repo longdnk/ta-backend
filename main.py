@@ -1,5 +1,6 @@
 from models.permission.initial_permission import initial_permission
 from models.prompt.initial_prompt import initial_prompt
+from fastapi.middleware.cors import CORSMiddleware
 from models.user.initial_user import initial_user
 from models.chat.initial_chat import initial_chat
 from models.role.initial_role import initial_role
@@ -9,6 +10,7 @@ from routes.auth import auth_router
 from routes.role import role_router
 from routes.user import user_router
 from routes.chat import chat_router
+from routes.model import model_router
 from fastapi import FastAPI, status
 from param_compile import params
 import uvicorn
@@ -28,6 +30,19 @@ app.include_router(role_router)
 app.include_router(permission_router)
 app.include_router(chat_router)
 app.include_router(prompt_router)
+app.include_router(model_router)
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Danh sách các domain được phép gọi API
+    allow_credentials=True,
+    allow_methods=[
+        "*"
+    ],  # Cho phép các phương thức HTTP như GET, POST, PUT, DELETE, v.v.
+    allow_headers=["*"],  # Cho phép các headers
+)
 
 @app.get("/")
 async def root():
