@@ -15,7 +15,7 @@ from datetime import datetime
 import asyncio
 import time
 
-client = InferenceClient(api_key="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+client = InferenceClient(api_key="")
 
 
 # Pydantic model for login payload
@@ -133,8 +133,9 @@ class Response():
         # Gửi từng chunk qua WebSocket
         for chunk in stream:
             content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+            print(content, end="")
             await self.websocket.send_json({"text": content})
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.1)
 
     async def stream_digit(self, stream):
         buffer = ""  # Bộ đệm để lưu trữ nội dung trước khi gửi
@@ -147,7 +148,7 @@ class Response():
                 while len(buffer) >= 10:
                     await self.websocket.send_json({"content": buffer[:10]})
                     buffer = buffer[10:]
-                    await asyncio.sleep(0.02)  # Thêm độ trễ 0.05 giây
+                    await asyncio.sleep(0.05)  # Thêm độ trễ 0.05 giây
 
     async def stream_word(self, stream):
         buffer = []  # Lưu trữ các từ
@@ -157,7 +158,7 @@ class Response():
                 buffer.extend(content.split())  # Chia nhỏ chunk thành các từ và thêm vào buffer
 
                 # Gửi mỗi lần 5 từ
-                while len(buffer) >= 5:
-                    await self.websocket.send_json({"content": " ".join(buffer[:5])})
-                    buffer = buffer[5:]  # Xóa 10 từ đã gửi
-                    await asyncio.sleep(0.02)
+                while len(buffer) >= 10:
+                    await self.websocket.send_json({"content": " ".join(buffer[:10])})
+                    buffer = buffer[10:]  # Xóa 10 từ đã gửi
+                    await asyncio.sleep(0.05)
