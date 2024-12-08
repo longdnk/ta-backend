@@ -14,9 +14,10 @@ from pydantic import BaseModel
 from datetime import datetime
 import asyncio
 import time
+from param_compile import params
 
 client = InferenceClient(api_key="")
-
+DELAY_THRESHOLD = params.web_socket_time
 
 # Pydantic model for login payload
 class ChatInfo(BaseModel):
@@ -29,6 +30,7 @@ model_router = APIRouter(prefix="/models", tags=["models"])
 
 # Danh sách các model được phép
 ALLOWED_MODELS = {
+    "Qwen/QwQ-32B-Preview",
     "Qwen/Qwen2.5-72B-Instruct",
     "Qwen/Qwen2.5-1.5B-Instruct",
     "meta-llama/Llama-3.2-3B-Instruct",
@@ -75,46 +77,52 @@ def run_model(chat_info: ChatInfo):
 async def streaming_chat(websocket: WebSocket):
     await websocket.accept()
     response = Response(websocket=websocket)
+    is_cancelled = False
     try:
         while True:
             try:
-                # Lắng nghe dữ liệu từ client
                 payload = await websocket.receive_json()
-                # Xử lý payload tại đây...
+
+                if payload.get("action") == "cancel":
+                    is_cancelled = True
+                    await websocket.send_json({"status": "cancelled"})
+                    break
+
+                if is_cancelled:
+                    break
+
+                model_name, messages, max_token, stream_mode = parse_payload(payload=payload)
+
+                if model_name not in ALLOWED_MODELS:
+                    await websocket.send_json({"error": "Model not allowed."})
+                    await websocket.close()
+                    return
+
+                stream = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=500 if max_token is None else max_token,
+                    temperature=params.model_temp,
+                    stream=True,
+                )
+
+                if stream_mode == 'token' or stream_mode is None:
+                    await response.stream_token(stream=stream)
+                elif stream_mode == 'digit':
+                    await response.stream_digit(stream=stream)
+                elif stream_mode == 'word':
+                    await response.stream_word(stream=stream)
+
+                await websocket.send_json({"text": None, "status": "done"})
+
             except WebSocketDisconnect:
-                break  # Thoát khỏi vòng lặp nếu WebSocket bị ngắt kết nốiA
-
-            # Parse payload
-            model_name, messages, max_token, stream_mode = parse_payload(payload=payload)
-            # Kiểm tra model hợp lệ
-            if model_name not in ALLOWED_MODELS:
-                await websocket.send_json({"error": "Model not allowed."})
-                await websocket.close()
-                return
-
-            # Gọi Hugging Face với chế độ stream
-            stream = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                max_tokens=500 if max_token is None else max_token,
-                stream=True,
-            )
-
-            if stream_mode == 'token' or stream_mode is None:
-                await response.stream_token(stream=stream)
-            elif stream_mode == 'digit':
-                await response.stream_digit(stream=stream)
-            elif stream_mode == 'word':
-                await response.stream_word(stream=stream)
-
-            await websocket.send_json({"status": "done"})
+                break  
 
     except WebSocketDisconnect:
         print("WebSocket disconnected")
         await websocket.close()
 
     except Exception as e:
-        # Gửi lỗi nếu có bất kỳ ngoại lệ nào
         await websocket.send_json({"error": str(e)})
         await websocket.close()
 
@@ -127,38 +135,43 @@ def parse_payload(payload):
 
 class Response():    
     def __init__(self, websocket):
-        self.websocket = websocket  # Lưu websocket để gửi dữ liệu
+        self.websocket = websocket  
 
-    async def stream_token(self, stream):
-        # Gửi từng chunk qua WebSocket
+    async def stream_token(self, stream, is_cancelled = False):
         for chunk in stream:
-            content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-            print(content, end="")
-            await self.websocket.send_json({"text": content})
-            await asyncio.sleep(0.1)
+            if is_cancelled:
+                break
+            content = chunk.choices[0].delta.content
+            await self.websocket.send_json({"text": content, "status": "continue"})
+            await asyncio.sleep(DELAY_THRESHOLD)
 
-    async def stream_digit(self, stream):
-        buffer = ""  # Bộ đệm để lưu trữ nội dung trước khi gửi
+    async def stream_digit(self, stream, is_cancelled = False):
+        buffer = ""  
         for chunk in stream:
-            content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-            if content:
-                buffer += content  # Thêm nội dung mới vào buffer
-
-                # Khi buffer có đủ 10 ký tự, gửi đi và cắt phần đã gửi
-                while len(buffer) >= 10:
-                    await self.websocket.send_json({"content": buffer[:10]})
-                    buffer = buffer[10:]
-                    await asyncio.sleep(0.05)  # Thêm độ trễ 0.05 giây
-
-    async def stream_word(self, stream):
-        buffer = []  # Lưu trữ các từ
-        for chunk in stream:
+            if is_cancelled:
+                break
             content = chunk.choices[0].delta.content
             if content:
-                buffer.extend(content.split())  # Chia nhỏ chunk thành các từ và thêm vào buffer
+                buffer += content  
 
-                # Gửi mỗi lần 5 từ
-                while len(buffer) >= 10:
-                    await self.websocket.send_json({"content": " ".join(buffer[:10])})
-                    buffer = buffer[10:]  # Xóa 10 từ đã gửi
-                    await asyncio.sleep(0.05)
+                while len(buffer) >= 5:
+                    await self.websocket.send_json({"text": buffer[:5], "status": "continue"})
+                    buffer = buffer[5:]
+                    await asyncio.sleep(DELAY_THRESHOLD)
+        if buffer:
+            await self.websocket.send_json({ "text": buffer, "status": "continue", })
+
+    async def stream_word(self, stream, is_cancelled = False):
+        buffer = []  
+        for chunk in stream:
+            if is_cancelled:
+                break
+            content = chunk.choices[0].delta.content
+            if content:
+                buffer.extend(content.split())  
+                while len(buffer) >= 5:
+                    await self.websocket.send_json({"text": " ".join(buffer[:5]), "status": "continue"})
+                    buffer = buffer[5:]  
+                    await asyncio.sleep(DELAY_THRESHOLD)
+        if buffer:
+            await self.websocket.send_json({ "text": " ".join(buffer), "status": "continue" })

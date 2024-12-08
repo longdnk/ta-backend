@@ -66,6 +66,18 @@ def param_compile():
         default="",
         help="SSL certificate file, use when deploy in production",
     )
+    parser.add_argument(
+        "--web_socket_time",
+        type=float,
+        default=0.1,
+        help="Web socket chat reload time"
+    )
+    parser.add_argument(
+        "--model_temp",
+        type=float,
+        default=0.05,
+        help="Model temparature"
+    )
     return parser.parse_args()
 
 
