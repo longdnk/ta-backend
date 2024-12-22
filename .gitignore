@@ -11,3 +11,5 @@ routes/__pycache__
 .env
 .idea
 .vscode
+run.sh
+chroma_db
