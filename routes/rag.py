@@ -12,11 +12,17 @@ from fastapi import APIRouter, status, Request
 
 from os.path import join, realpath
 from sqlalchemy.exc import SQLAlchemyError
+from param_compile import params
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 sys.path.append(realpath(join(realpath(__file__), "..", "..")))
 
+if params.prod is True:
+    print("Run config")
+    __import__("pysqlite3")
+
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
 rag_router = APIRouter(prefix="/rags", tags=["rags"])
 print("===Rag Router===")

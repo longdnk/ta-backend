@@ -78,6 +78,12 @@ def param_compile():
         default=0.05,
         help="Model temparature"
     )
+    parser.add_argument(
+        "--prod",
+        type=bool,
+        default=False,
+        help="Model temparature"
+    )
     return parser.parse_args()
 
 
