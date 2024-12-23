@@ -1,3 +1,4 @@
+import os
 from fastapi import (
     APIRouter,
     status,
@@ -13,10 +14,10 @@ from typing import Dict, List
 from pydantic import BaseModel
 from datetime import datetime
 import asyncio
-import time
 from param_compile import params
 
-client = InferenceClient(api_key="")
+key = os.environ.get("HF_TOKEN")
+client = InferenceClient(api_key=key)
 DELAY_THRESHOLD = params.web_socket_time
 
 # Pydantic model for login payload
@@ -135,7 +136,7 @@ def parse_payload(payload):
 
 class Response():    
     def __init__(self, websocket):
-        self.websocket = websocket  
+        self.websocket = websocket
 
     async def stream_token(self, stream, is_cancelled = False):
         for chunk in stream:
@@ -159,7 +160,7 @@ class Response():
                     buffer = buffer[5:]
                     await asyncio.sleep(DELAY_THRESHOLD)
         if buffer:
-            await self.websocket.send_json({ "text": buffer, "status": "continue", })
+            await self.websocket.send_json({ "text": buffer, "status": "continue" })
 
     async def stream_word(self, stream, is_cancelled = False):
         buffer = []  

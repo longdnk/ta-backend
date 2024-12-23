@@ -6,11 +6,12 @@ from models.chat.initial_chat import initial_chat
 from models.role.initial_role import initial_role
 from routes.permission import permission_router
 from routes.prompt import prompt_router
+from routes.model import model_router
 from routes.auth import auth_router
 from routes.role import role_router
 from routes.user import user_router
 from routes.chat import chat_router
-from routes.model import model_router
+from routes.rag import rag_router
 from fastapi import FastAPI, status
 from param_compile import params
 import uvicorn
@@ -31,6 +32,7 @@ app.include_router(permission_router)
 app.include_router(chat_router)
 app.include_router(prompt_router)
 app.include_router(model_router)
+app.include_router(rag_router)
 
 origins = ["*"]
 

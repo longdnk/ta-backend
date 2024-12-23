@@ -1,3 +1,4 @@
+import os
 from fastapi import Depends
 from typing import Annotated
 from sqlalchemy.orm import Session
@@ -5,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-URL_DATABASE = ""
+URL_DATABASE = os.environ.get("URL_DATABASE")
 
 engine = create_engine(URL_DATABASE)
 
