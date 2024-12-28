@@ -45,7 +45,7 @@ class RAGSystem:
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
         text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
-            tokenizer=tokenizer, chunk_size=200, chunk_overlap=10
+            tokenizer=tokenizer, chunk_size=500, chunk_overlap=10
         )
 
         all_splits = text_splitter.split_documents(documents)

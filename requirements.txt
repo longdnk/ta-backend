@@ -13,3 +13,4 @@ langgraph
 chromadb
 sentence-transformers
 sentencepiece
+pysqlite3

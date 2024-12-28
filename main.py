@@ -38,12 +38,12 @@ origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Danh sách các domain được phép gọi API
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=[
         "*"
-    ],  # Cho phép các phương thức HTTP như GET, POST, PUT, DELETE, v.v.
-    allow_headers=["*"],  # Cho phép các headers
+    ], 
+    allow_headers=["*"],
 )
 
 @app.get("/")

@@ -1,4 +1,6 @@
 import os
+import json
+import asyncio
 from fastapi import (
     APIRouter,
     status,
@@ -7,13 +9,14 @@ from fastapi import (
     HTTPException,
     Request,
     Depends,
+    Response
 )
+from fastapi.responses import StreamingResponse
 from huggingface_hub import InferenceClient
 from response.response_item import response
 from typing import Dict, List
 from pydantic import BaseModel
 from datetime import datetime
-import asyncio
 from param_compile import params
 
 key = os.environ.get("HF_TOKEN")
@@ -43,36 +46,30 @@ ALLOWED_MODELS = {
 }
 
 @model_router.post("/inference", status_code=status.HTTP_200_OK)
-def run_model(chat_info: ChatInfo):
-    try:
-        # Kiểm tra model có được phép hay không
-        if chat_info.model_name not in ALLOWED_MODELS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Model '{chat_info.model_name}' is not allowed. Accepted models are: {', '.join(ALLOWED_MODELS)}",
+async def run_model(chat_info: ChatInfo):
+    messages = chat_info.conservation
+    model = chat_info.model_name
+    max_token = chat_info.max_token if chat_info.max_token is not None else 500
+
+    async def generate_stream():
+        try:
+            # Create a stream from Hugging Face API
+            stream = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_token,
+                stream=True,
             )
+            # Iterate through the stream and yield text content
+            for chunk in stream:
+                content = chunk.choices[0].delta.content
+                yield content
+                await asyncio.sleep(0.01)  # Yield control to event loop
 
-        # Trích xuất messages từ payload
-        messages = chat_info.conservation
+        except Exception as e:
+            yield f"Error: {str(e)}\n"
 
-        # Gọi API inference
-        completion = client.chat.completions.create(
-            model=chat_info.model_name,  # Sử dụng model từ payload
-            messages=messages,  # Nội dung hội thoại
-            max_tokens=500 if chat_info.max_token is None else chat_info.max_token,  # Giới hạn số token
-        )
-        # Trả về phản hồi
-        return {
-            "code": status.HTTP_200_OK,
-            "message": "Generated success",
-            "data": completion.choices[0].message.content,
-        }
-
-    except HTTPException as e:
-        raise e  # Ném lại lỗi HTTPException để FastAPI xử lý
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+    return StreamingResponse(generate_stream(), media_type="text/plain")
 
 @model_router.websocket("/inference")
 async def streaming_chat(websocket: WebSocket):
