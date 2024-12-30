@@ -15,7 +15,7 @@ jobs:
        run: docker build . -t ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:latest
 
      - name: Login Docker Hub
-       run: docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_TOKEN }}
+       run: docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin ${{ secrets.DOCKER_HUB_TOKEN }}
 
      - name: Push image to github
        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:latest
@@ -30,10 +30,12 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          timeout: 1200s
+          command_timeout: 1200s 
           port: 22
           script: |
             pwd
-            docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_TOKEN }}
+            docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin ${{ secrets.DOCKER_HUB_TOKEN }}
             cd /home/ta-backend-deployment/
             ls -al
             docker-compose up -d --build
