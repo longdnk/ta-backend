@@ -41,3 +41,4 @@ jobs:
             docker-compose down
             docker system prune --all -f
             docker-compose up -d --build
+            docker logout
