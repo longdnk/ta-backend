@@ -30,8 +30,8 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          timeout: 1200s
-          command_timeout: 1200s 
+          timeout: 1800s
+          command_timeout: 1800s 
           port: 22
           script: |
             pwd
