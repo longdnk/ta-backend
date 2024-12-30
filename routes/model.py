@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import asyncio
 from fastapi import (
     APIRouter,
@@ -51,8 +50,6 @@ async def run_model(chat_info: ChatInfo):
     messages = chat_info.conservation
     model = chat_info.model_name
     max_token = chat_info.max_token if chat_info.max_token is not None else 500
-
-    await asyncio.sleep(1)
 
     async def generate_stream():
         try:
