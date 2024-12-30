@@ -20,6 +20,9 @@ jobs:
      - name: Push image to github
        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:latest
 
+     - name: Clear Docker token
+       run: docker logout
+
   DEPLOYMENT:
     runs-on: ubuntu-22.04
     needs: BUILD 
@@ -30,8 +33,8 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          timeout: 1800s
-          command_timeout: 1800s 
+          timeout: 2800s
+          command_timeout: 2800s 
           port: 22
           script: |
             pwd
