@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import asyncio
 from fastapi import (
     APIRouter,
@@ -51,6 +52,8 @@ async def run_model(chat_info: ChatInfo):
     model = chat_info.model_name
     max_token = chat_info.max_token if chat_info.max_token is not None else 500
 
+    await asyncio.sleep(1)
+
     async def generate_stream():
         try:
             # Create a stream from Hugging Face API
@@ -64,7 +67,7 @@ async def run_model(chat_info: ChatInfo):
             for chunk in stream:
                 content = chunk.choices[0].delta.content
                 yield content
-                await asyncio.sleep(0.01)  # Yield control to event loop
+                await asyncio.sleep(DELAY_THRESHOLD)  # Yield control to event loop
 
         except Exception as e:
             yield f"Error: {str(e)}\n"
