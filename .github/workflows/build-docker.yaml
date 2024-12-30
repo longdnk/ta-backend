@@ -38,4 +38,6 @@ jobs:
             docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password ${{ secrets.DOCKER_HUB_TOKEN }}
             cd /home/ta-backend-deployment/
             ls -al
+            docker-compose down
+            docker system prune --all -f
             docker-compose up -d --build
