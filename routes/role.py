@@ -1,204 +1,178 @@
-from fastapi import APIRouter, status, HTTPException, Request
-from models.permission.permission import Permission
-from models.role.role import Role, RoleEntity
-from response.response_item import response
-from database.database import db_dependency
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from typing import List
+from models.role import Role
 from datetime import datetime
-from uuid import uuid4
+from schema.role import RoleEntity
+from models.permission import Permission
+from database.database import db_dependency
+from schema.response import ResponseMessage
+from fastapi.exceptions import RequestValidationError
+from fastapi import APIRouter, status, Depends, HTTPException
 
 role_router = APIRouter(prefix="/roles", tags=["roles"])
 
+@role_router.get("", status_code=status.HTTP_200_OK, name="Get all role")
+async def fetch_all(db: db_dependency, skip: int = 0, limit: int = 100):
+    try:
+        query = (
+            db.query(Role)
+            .filter(Role.is_deleted == False)
+            .offset(skip)
+            .limit(limit)
+        )
+        roles: List[Role] = query.all()
 
-@role_router.get("", status_code=status.HTTP_200_OK)
-async def get_roles(
-    request: Request, db: db_dependency, skip: int = 0, limit: int = 100
-):
-    roles = (
-        db.query(Role)
-        .filter(Role.is_deleted == False)
-        .order_by(Role.created_at.asc())
-        .all()
-    )
-
-    if roles is None:
-        return response(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Cannot find role list",
-            type="error",
-            data=[],
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message="Fetch all role success",
+            data=roles
         )
 
-    return response(
-        code=status.HTTP_200_OK,
-        message="OK",
-        type="info",
-        data=roles[skip : skip + limit],
-    )
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
 
-@role_router.post("", status_code=status.HTTP_201_CREATED)
-async def create_role(request: Request, role_entity: RoleEntity, db: db_dependency):
+@role_router.get("/{role_id}", status_code=status.HTTP_200_OK, name="Get role by id")
+async def fetch_detail(role_id: int, db: db_dependency):
     try:
-        # Kiểm tra tên vai trò không được rỗng
-        if role_entity.name == "":
-            return response(
-                code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                message="Role name cannot be empty",
-                type="error",
-                data={"name": "Role name cannot be empty"},
-            )
-
-        # Kiểm tra tên vai trò đã tồn tại chưa
-        existing_role = (
+        role: Role = (
             db.query(Role)
-            .filter(Role.name == role_entity.name, Role.is_deleted == False)
+            .filter(Role.id == role_id, Role.is_deleted == False)
             .first()
         )
+
+        if not role:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Role with ID {role_id} not found.",
+            )
+
+        permissions = (
+            db.query(Permission)
+            .filter(Permission.id.in_(role.permission_ids))
+            .all()
+        )
+
+        role_data = role.to_dict()
+        role_data['permissions'] = [permission.to_dict() for permission in permissions]
+
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message=f"Fetch role with id {role_id} success",
+            data=role_data,
+        )
+
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
+
+@role_router.post("", status_code=status.HTTP_201_CREATED, name="Add new role")
+async def create(role_item: RoleEntity, db: db_dependency):
+    try:
+        existing_role = db.query(Role).filter(Role.name == role_item.name).first()
         if existing_role:
-            return response(
-                code=status.HTTP_409_CONFLICT,
-                message="Role name already exists",
-                type="error",
-                data={"name": f"Role with name '{role_entity.name}' already exists"},
+            return ResponseMessage(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=f"Role {role_item.name} already exists.",
             )
 
-        # Kiểm tra các permission_ids có tồn tại không
-        invalid_permissions = [
-            perm_id
-            for perm_id in role_entity.permission_ids
-            if not db.query(Permission).filter(Permission.id == perm_id).first()
-        ]
+        permission_ids = role_item.permission_ids if role_item.permission_ids else [] 
+        existing_permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
+        existing_permission_ids = [permission.id for permission in existing_permissions]
 
-        if invalid_permissions:
-            return response(
-                code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                message="Invalid permission IDs",
-                type="error",
-                data={"invalid_permission_ids": invalid_permissions},
+        missing_permission_ids = set(permission_ids) - set(existing_permission_ids)
+        if missing_permission_ids:
+            return ResponseMessage(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="Permission id is not exist",
+                data={"detail":f"Permissions with IDs {missing_permission_ids} do not exist."}
             )
 
-        # Tạo vai trò mới
-        new_role = Role(**role_entity.dict())
-        new_role.id = str(uuid4())
+        new_role = Role(**role_item.dict())
 
         db.add(new_role)
         db.commit()
-
-        return response(
+        db.refresh(new_role)
+        return ResponseMessage(
             code=status.HTTP_201_CREATED,
             message="Role created successfully",
-            type="info",
-            data={
-                "id": new_role.id,
-                "name": new_role.name,
-                "permission_ids": new_role.permission_ids,
-            },
+            data=new_role,
         )
-    except IntegrityError:
+
+    except Exception as e:
         db.rollback()
-        return response(
+        return ResponseMessage(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Database error",
-            type="error",
-            data={"error": "Server Internal Error"},
+            message=f"Database error: {str(e)}",
         )
 
-@role_router.get("/{role_id}", status_code=status.HTTP_200_OK)
-async def get_role(role_id: str, db: db_dependency):
-    role: Role = (
-        db.query(Role).filter(Role.id == role_id, Role.is_deleted == False).first()
-    )
-
+@role_router.put("/{role_id}", status_code=status.HTTP_200_OK, name="Update role")
+async def update_role(role_id: int, role_item: RoleEntity, db: db_dependency):
+    role: Role = db.query(Role).filter(Role.id == role_id, Role.is_deleted == False).first()
     if not role:
-        return response(
+        return ResponseMessage(
             code=status.HTTP_404_NOT_FOUND,
-            message="Role not found",
-            type="error",
-            data={"error": "Cannot find role"},
+            message=f"Role with ID {role_id} not found.",
         )
 
-    return response(
-        code=status.HTTP_200_OK,
-        message="OK",
-        type="info",
-        data=role,
-    )
-
-
-@role_router.put("/{role_id}", status_code=status.HTTP_200_OK)
-async def update_role(role_id: str, role_entity: RoleEntity, db: db_dependency):
-    role: Role = db.query(Role).filter(Role.id == role_id).first()
-
-    if not role:
-        return response(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Role not found",
-            type="error",
-            data={"error": f"Cannot find role with id {role_id}"},
+    existing_role = db.query(Role).filter(Role.name == role_item.name).first()
+    if existing_role and existing_role.id != role_id:
+        return ResponseMessage(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=f"Role with name '{role_item.name}' already exists."
         )
 
-    # Kiểm tra tên vai trò không được rỗng
-    if role_entity.name == "":
-        return response(
-            code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message="Role name cannot be empty",
-            type="error",
-            data={"name": "Role name cannot be empty"},
+    permission_ids = role_item.permission_ids if role_item.permission_ids else []  # Đảm bảo sử dụng permission_ids
+    existing_permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
+    existing_permission_ids = [permission.id for permission in existing_permissions]
+
+    missing_permission_ids = set(permission_ids) - set(existing_permission_ids)
+    if missing_permission_ids:
+        return ResponseMessage(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=f"Permissions with IDs {missing_permission_ids} do not exist."
         )
 
-    # Kiểm tra các permission_ids có tồn tại không
-    invalid_permissions = [
-        perm_id
-        for perm_id in role_entity.permission_ids
-        if not db.query(Permission).filter(Permission.id == perm_id).first()
-    ]
-
-    if invalid_permissions:
-        return response(
-            code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message="Invalid permission IDs",
-            type="error",
-            data={"invalid_permission_ids": invalid_permissions},
-        )
-
-    # Cập nhật thông tin vai trò
-    role.name = role_entity.name
-    role.permission_ids = role_entity.permission_ids
-    role.is_deleted = role_entity.is_deleted
-    role.updated_at = datetime.utcnow()
+    role.name = role_item.name
+    role.permission_ids = permission_ids  
+    role.updated_at = datetime.now()
 
     db.commit()
+    db.refresh(role)
 
-    return response(
+    return ResponseMessage(
         code=status.HTTP_200_OK,
-        message="Role updated successfully",
-        type="info",
-        data={"id": role.id, "name": role.name, "permission_ids": role.permission_ids},
+        message="Role updated successfully.",
+        data=role.to_dict()
     )
 
+@role_router.delete("/{role_id}", status_code=status.HTTP_200_OK, name="Delete role")
+async def delete(role_id: int, db: db_dependency):
+    try:
+        role: Role = db.query(Role).filter(Role.id == role_id, Role.is_deleted == False).first()
+        if not role:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Role with ID {role_id} not found."
+            )
 
-@role_router.delete("/{role_id}", status_code=status.HTTP_200_OK)
-async def delete_role(role_id: str, db: db_dependency):
-    role: Role = db.query(Role).filter(Role.id == role_id).first()
+        role.is_deleted = True
+        db.commit()
+        db.refresh(role)
 
-    if not role:
-        return response(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Role not found",
-            type="error",
-            data={"error": "Cannot find role item"},
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message=f"Role with ID {role_id} has been soft deleted successfully.",
+            data=role
         )
-
-    # Đánh dấu Role là đã xóa
-    role.is_deleted = True
-    role.updated_at = datetime.utcnow()
-
-    db.commit()
-
-    return response(
-        code=status.HTTP_200_OK,
-        message="Role deleted successfully",
-        type="info",
-        data={"id": role_id},
-    )
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )

@@ -1,16 +1,4 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-pymysql
-pyjwt
-huggingface_hub
-langchain
-langchain_chroma
-langchain_community
-langchain_openai
-langchain_huggingface
-langgraph
-chromadb
-sentence-transformers
-sentencepiece
-pysqlite3
+pymsql

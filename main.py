@@ -1,38 +1,32 @@
-from models.permission.initial_permission import initial_permission
-from models.prompt.initial_prompt import initial_prompt
-from fastapi.middleware.cors import CORSMiddleware
-from models.user.initial_user import initial_user
-from models.chat.initial_chat import initial_chat
-from models.role.initial_role import initial_role
-from routes.permission import permission_router
-from routes.prompt import prompt_router
-from routes.model import model_router
-from routes.auth import auth_router
-from routes.role import role_router
-from routes.user import user_router
-from routes.chat import chat_router
-from routes.rag import rag_router
-from fastapi import FastAPI, status
-from param_compile import params
 import uvicorn
+from param_compile import params
+from routes.role import role_router
+from routes.prompt import prompt_router
+from schema.response import ResponseMessage
+from fastapi import FastAPI, status, Request
+from routes.permission import permission_router
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 
 app = FastAPI()
 
-# Initial Model
-initial_permission()
-initial_prompt()
-initial_role()
-initial_user()
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    error_item = exc.errors()[0]
+    return ResponseMessage(
+        code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        message="Invalid request entity",
+        data={
+            "error": f"{error_item['msg']}",
+            "error_field": f"{error_item['input']}",
+            "detail": f"{error_item}"
+        }
+    )
 
-# App Routes
-app.include_router(auth_router)
-app.include_router(user_router)
-app.include_router(role_router)
-app.include_router(permission_router)
-app.include_router(chat_router)
-app.include_router(prompt_router)
-app.include_router(model_router)
-app.include_router(rag_router)
+routers = [role_router, permission_router, prompt_router]
+
+for router in routers:
+    app.include_router(router)
 
 origins = ["*"]
 
@@ -40,15 +34,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=[
-        "*"
-    ], 
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.get("/")
 async def root():
-    return {"code": status.HTTP_200_OK, "message": "Check Health in root path OK"}
+    return {"code": status.HTTP_200_OK, "message": "Check health Done"}
 
 
 def run_server():

@@ -1,0 +1,176 @@
+from pydantic import BaseModel
+from typing import List, Optional
+
+class RoleEntity(BaseModel):
+    name: str
+    permission_ids: List[str]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class PermissionEntity(BaseModel):
+    name: str
+    route: str
+    is_deleted: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ChatEntity(BaseModel):
+    title: str
+    conversation: str
+    user_id: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class PromptEntity(BaseModel):
+    content: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ModelEntity(BaseModel):
+    name: str
+    detail_name: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class UserEntity(BaseModel):
+    user_name: str
+    email: str
+    password: str
+    image: Optional[str] = None
+    token: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    chat_ids: List[str]
+    prompt_ids: List[str]
+    default_prompt: str
+    role_id: str
+    models: List[str]
+    default_model: str
+
+
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy.orm import sessionmaker, relationship, validates
+from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
+from sqlalchemy import func
+
+# Kết nối cơ sở dữ liệu MySQL
+DATABASE_URL = "mysql+mysqlconnector://username:password@localhost/TA-DB"
+engine = create_engine(DATABASE_URL, echo=True)
+
+Base = declarative_base()
+
+# Các model tương ứng với bảng
+class Role(Base):
+    __tablename__ = 'role'
+
+    id = Column(Integer, primary_key=True, index=True)  # Chuyển từ String sang Integer
+    name = Column(String(255), nullable=False)
+    permission_ids = Column(Text, nullable=False)  # Lưu dưới dạng JSON
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    permissions = relationship("Permission", backref="role", lazy=True)
+
+class Permission(Base):
+    __tablename__ = 'permission'
+
+    id = Column(Integer, primary_key=True, index=True)  # Chuyển từ String sang Integer
+    name = Column(String(255), nullable=False)
+    route = Column(String(255), nullable=False)
+    is_deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    @validates('name')
+    def validate_name(self, key, value):
+        if not value:
+            raise ValueError("name cannot be empty")
+        return value
+
+    @validates('route')
+    def validate_route(self, key, value):
+        if not value:
+            raise ValueError("route cannot be empty")
+        return value
+
+    __table_args__ = (
+        UniqueConstraint("name", "route", name="unique_name_route"),
+        UniqueConstraint("name", name="unique_name"),
+        UniqueConstraint("route", name="unique_route"),
+    )
+
+class Chat(Base):
+    __tablename__ = 'chat'
+
+    id = Column(Integer, primary_key=True, index=True)  # Chuyển từ String sang Integer
+    title = Column(String(255), nullable=False)
+    conversation = Column(Text, nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'))  # Sử dụng Integer thay vì String
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Prompt(Base):
+    __tablename__ = 'prompt'
+
+    id = Column(Integer, primary_key=True, index=True)  # Chuyển từ String sang Integer
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Model(Base):
+    __tablename__ = 'model'
+
+    id = Column(Integer, primary_key=True, index=True)  # Chuyển từ String sang Integer
+    name = Column(String(255), nullable=False)
+    detail_name = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class User(Base):
+    __tablename__ = 'user'
+
+    id = Column(Integer, primary_key=True, index=True)  # Chuyển từ String sang Integer
+    user_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, unique=True)
+    password = Column(String(255), nullable=False)
+    image = Column(String(255), nullable=True)
+    token = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    chat_ids = Column(Text, nullable=True)  # Lưu dưới dạng JSON
+    prompt_ids = Column(Text, nullable=True)  # Lưu dưới dạng JSON
+    default_prompt = Column(Integer, nullable=False)  # Chuyển từ String sang Integer
+    role_id = Column(Integer, ForeignKey('role.id'))  # Sử dụng Integer thay vì String
+    models = Column(Text, nullable=True)  # Lưu dưới dạng JSON
+    default_model = Column(Integer, nullable=False)  # Chuyển từ String sang Integer
+    role = relationship("Role", back_populates="users")
+
+
+Role.users = relationship("User", back_populates="role")
+
+# Tạo DB và các bảng nếu chưa tồn tại
+Base.metadata.create_all(bind=engine)
+
+# Tạo session
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Đoạn mã Insert dữ liệu mẫu
+def insert_sample_data():
+    db = SessionLocal()
+    try:
+        # Tạo dữ liệu mẫu
+        role = Role(id="1", name="admin", permission_ids=json.dumps(["1", "2", "3"]))
+        permission = Permission(id="1", name="view_dashboard", route="/dashboard")
+        user = User(id="1", user_name="admin_user", email="admin@example.com", password="password", default_prompt="1", default_model="1", role_id="1", chat_ids=json.dumps([]), prompt_ids=json.dumps([]), models=json.dumps([]))
+
+        # Thêm dữ liệu vào DB
+        db.add(role)
+        db.add(permission)
+        db.add(user)
+
+        db.commit()
+    finally:
+        db.close()
+
+# Gọi hàm để insert dữ liệu
+insert_sample_data()

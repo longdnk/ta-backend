@@ -6,69 +6,69 @@ USE LLM;
 
 -- Tạo bảng role
 CREATE TABLE IF NOT EXISTS role (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    permission_ids JSON NOT NULL, -- Lưu danh sách permission_id dưới dạng JSON
-    is_deleted BOOLEAN DEFAULT FALSE, -- Thêm trường is_deleted
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- Thêm thời gian cập nhật
+    id INT AUTO_INCREMENT PRIMARY KEY,  
+    name VARCHAR(255) NOT NULL UNIQUE,
+    permissions JSON NOT NULL DEFAULT ('[]'),  -- Lưu danh sách permission_id dưới dạng JSON
+    is_deleted BOOLEAN DEFAULT FALSE,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Tạo bảng permission
 CREATE TABLE IF NOT EXISTS permission (
-    id VARCHAR(255) PRIMARY KEY, -- ID chính
-    name VARCHAR(255) NOT NULL, -- Không được NULL
-    route VARCHAR(255) NOT NULL, -- Không được NULL
-    is_deleted BOOLEAN DEFAULT FALSE, -- Cờ đánh dấu đã bị xóa
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thời gian tạo
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Thời gian cập nhật
-
-    -- Ràng buộc UNIQUE cho name và route
-    CONSTRAINT unique_name_route UNIQUE (name, route),
-    CONSTRAINT unique_name UNIQUE (name),
-    CONSTRAINT unique_route UNIQUE (route),
-
-    -- Ràng buộc CHECK để đảm bảo không chứa chuỗi rỗng
-    CONSTRAINT check_name_not_empty CHECK (name <> ''),
-    CONSTRAINT check_route_not_empty CHECK (route <> '')
-);
-
--- Tạo bảng user
-CREATE TABLE IF NOT EXISTS user (
-    id VARCHAR(255) PRIMARY KEY,
-    user_name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    image VARCHAR(255),
-    token VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    chat_ids JSON,
-    prompt_ids JSON,
-    default_prompt VARCHAR(255),
-    role_id VARCHAR(255),
-    is_deleted BOOLEAN DEFAULT FALSE, -- Thêm trường is_deleted
-    FOREIGN KEY (role_id) REFERENCES role (id) ON DELETE SET NULL,
-    FOREIGN KEY (default_prompt) REFERENCES prompt (id) ON DELETE SET NULL
-);
-
--- Tạo bảng prompt
-CREATE TABLE IF NOT EXISTS prompt (
-    id VARCHAR(255) PRIMARY KEY,
-    content TEXT NOT NULL,
-    is_deleted BOOLEAN DEFAULT FALSE, -- Thêm trường is_deleted
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- Thêm thời gian cập nhật
+    id INT AUTO_INCREMENT PRIMARY KEY,  
+    name VARCHAR(255) NOT NULL UNIQUE,
+    route VARCHAR(255) NOT NULL UNIQUE,
+    is_deleted BOOLEAN DEFAULT FALSE,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Tạo bảng chat
 CREATE TABLE IF NOT EXISTS chat (
-    id VARCHAR(255) PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,  -- Sử dụng INT thay vì VARCHAR
     title VARCHAR(255) NOT NULL,
-    chunks JSON NOT NULL,
-    user_id VARCHAR(255) NOT NULL,
-    is_deleted BOOLEAN DEFAULT FALSE, -- Thêm trường is_deleted
+    conversation TEXT NOT NULL,
+    user_id INT, -- Liên kết với bảng user, chuyển sang kiểu INT
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Thêm thời gian cập nhật
-    FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES user(id) -- Mối quan hệ với bảng user
+);
+
+-- Tạo bảng prompt
+CREATE TABLE IF NOT EXISTS prompt (
+    id INT AUTO_INCREMENT PRIMARY KEY,  -- Sử dụng INT thay vì VARCHAR
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- Thêm thời gian cập nhật
+);
+
+-- Tạo bảng model
+CREATE TABLE IF NOT EXISTS model (
+    id INT AUTO_INCREMENT PRIMARY KEY,  -- Sử dụng INT thay vì VARCHAR
+    name VARCHAR(255) NOT NULL,
+    detail_name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- Thêm thời gian cập nhật
+);
+
+-- Tạo bảng user
+CREATE TABLE IF NOT EXISTS user (
+    id INT AUTO_INCREMENT PRIMARY KEY,  -- Sử dụng INT thay vì VARCHAR
+    user_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    image VARCHAR(255), -- Thêm trường image
+    token VARCHAR(255), -- Thêm trường token
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Thêm thời gian cập nhật
+    chat_ids JSON, -- Liên kết với bảng chat, lưu dưới dạng JSON
+    prompt_ids JSON, -- Liên kết với bảng prompt, lưu dưới dạng JSON
+    default_prompt INT NOT NULL, -- Liên kết với bảng prompt (sử dụng ID là INT)
+    role_id INT, -- Liên kết với bảng role (sử dụng ID là INT)
+    models JSON, -- Liên kết với bảng model, lưu dưới dạng JSON
+    default_model INT NOT NULL, -- Liên kết với bảng model (sử dụng ID là INT)
+    FOREIGN KEY (role_id) REFERENCES role(id), -- Mối quan hệ với bảng role
+    FOREIGN KEY (default_prompt) REFERENCES prompt(id), -- Mối quan hệ với bảng prompt
+    FOREIGN KEY (default_model) REFERENCES model(id) -- Mối quan hệ với bảng model
 );
