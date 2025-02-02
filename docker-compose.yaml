@@ -10,9 +10,6 @@ services:
     volumes:
       - /etc/letsencrypt/live/info.supercharge.vn/fullchain.pem:/etc/nginx/ssl/cert.pem
       - /etc/letsencrypt/live/info.supercharge.vn/privkey.pem:/etc/nginx/ssl/private.pem 
-    environment:
-      - HF_TOKEN=
-      - URL_DATABASE=
 
   nginx:
     build: ./proxy

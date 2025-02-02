@@ -1,5 +1,7 @@
 import uvicorn
+from dotenv import load_dotenv
 from param_compile import params
+load_dotenv()
 from routes.auth import auth_router
 from routes.role import role_router
 from routes.chat import chat_router
