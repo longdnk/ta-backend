@@ -9,6 +9,8 @@ from sqlalchemy import (
     UniqueConstraint,
     JSON,
     func,
+    Table,
+    ForeignKey
 )
 from sqlalchemy.orm import relationship 
 

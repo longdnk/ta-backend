@@ -1,6 +1,9 @@
 import uvicorn
 from param_compile import params
+from routes.auth import auth_router
 from routes.role import role_router
+from routes.chat import chat_router
+from routes.user import user_router
 from routes.model import model_router
 from routes.prompt import prompt_router
 from schema.response import ResponseMessage
@@ -20,11 +23,20 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         data={
             "error": f"{error_item['msg']}",
             "error_field": f"{error_item['input']}",
-            "detail": f"{error_item}"
-        }
+            "detail": f"{error_item}",
+        },
     )
 
-routers = [role_router, permission_router, prompt_router, model_router]
+
+routers = [
+    auth_router,
+    user_router,
+    chat_router,
+    role_router,
+    permission_router,
+    prompt_router,
+    model_router,
+]
 
 for router in routers:
     app.include_router(router)
