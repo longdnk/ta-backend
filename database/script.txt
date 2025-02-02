@@ -8,7 +8,7 @@ USE LLM;
 CREATE TABLE IF NOT EXISTS role (
     id INT AUTO_INCREMENT PRIMARY KEY,  
     name VARCHAR(255) NOT NULL UNIQUE,
-    permissions JSON NOT NULL DEFAULT ('[]'),  -- Lưu danh sách permission_id dưới dạng JSON
+    permission_ids JSON NOT NULL DEFAULT ('[]'),  -- Lưu danh sách permission_id dưới dạng JSON
     is_deleted BOOLEAN DEFAULT FALSE,  
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -51,7 +51,6 @@ CREATE TABLE IF NOT EXISTS model (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- Thêm thời gian cập nhật
 );
-
 -- Tạo bảng user
 CREATE TABLE IF NOT EXISTS user (
     id INT AUTO_INCREMENT PRIMARY KEY,  -- Sử dụng INT thay vì VARCHAR
@@ -59,9 +58,10 @@ CREATE TABLE IF NOT EXISTS user (
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     image VARCHAR(255), -- Thêm trường image
-    token VARCHAR(255), -- Thêm trường token
+    token TEXT NOT NULL, -- Thêm trường token
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Thêm thời gian tạo
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Thêm thời gian cập nhật
+    is_deleted BOOLEAN DEFAULT FALSE,  
     chat_ids JSON, -- Liên kết với bảng chat, lưu dưới dạng JSON
     prompt_ids JSON, -- Liên kết với bảng prompt, lưu dưới dạng JSON
     default_prompt INT NOT NULL, -- Liên kết với bảng prompt (sử dụng ID là INT)
