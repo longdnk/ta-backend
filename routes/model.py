@@ -1,175 +1,160 @@
-import os
-import json
-import asyncio
-from fastapi import (
-    APIRouter,
-    status,
-    WebSocket,
-    WebSocketDisconnect,
-    HTTPException,
-    Request,
-    Depends,
-    Response
-)
-from fastapi.responses import StreamingResponse
-from huggingface_hub import InferenceClient
-from response.response_item import response
-from typing import Dict, List
-from pydantic import BaseModel
+from typing import List
 from datetime import datetime
-from param_compile import params
-
-key = os.environ.get("HF_TOKEN")
-client = InferenceClient(api_key=key)
-DELAY_THRESHOLD = params.web_socket_time
-
-# Pydantic model for login payload
-class ChatInfo(BaseModel):
-    model_name: str
-    conservation: List[Dict[str, str]]
-    max_token: int | None = None
-
+from models.model import Model 
+from schema.model import ModelEntity 
+from database.database import db_dependency
+from schema.response import ResponseMessage
+from fastapi.exceptions import RequestValidationError
+from fastapi import APIRouter, status, Depends, HTTPException
 
 model_router = APIRouter(prefix="/models", tags=["models"])
 
-# Danh sách các model được phép
-ALLOWED_MODELS = {
-    "Qwen/QwQ-32B-Preview",
-    "Qwen/Qwen2.5-72B-Instruct",
-    "Qwen/Qwen2.5-1.5B-Instruct",
-    "meta-llama/Llama-3.2-3B-Instruct",
-    "meta-llama/Llama-3.2-1B-Instruct",
-    "meta-llama/Meta-Llama-3-8B-Instruct",
-    "meta-llama/Llama-3.1-8B-Instruct",
-    "microsoft/Phi-3.5-mini-instruct",
-    "microsoft/Phi-3-mini-4k-instruct",
-}
-
-@model_router.post("/inference", status_code=status.HTTP_200_OK)
-async def run_model(chat_info: ChatInfo):
-    messages = chat_info.conservation
-    model = chat_info.model_name
-    max_token = chat_info.max_token if chat_info.max_token is not None else 500
-
-    async def generate_stream():
-        try:
-            # Create a stream from Hugging Face API
-            stream = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_token,
-                stream=True,
-            )
-            # Iterate through the stream and yield text content
-            for chunk in stream:
-                content = chunk.choices[0].delta.content
-                yield content
-                await asyncio.sleep(DELAY_THRESHOLD)  # Yield control to event loop
-
-        except Exception as e:
-            yield f"Error: {str(e)}\n"
-
-    return StreamingResponse(generate_stream(), media_type="text/plain")
-
-@model_router.websocket("/inference")
-async def streaming_chat(websocket: WebSocket):
-    await websocket.accept()
-    response = Response(websocket=websocket)
-    is_cancelled = False
+@model_router.get("", status_code=status.HTTP_200_OK, name="Get all model")
+async def fetch_all(db: db_dependency, skip: int = 0, limit: int = 100):
     try:
-        while True:
-            try:
-                payload = await websocket.receive_json()
+        query = (
+            db.query(Model)
+            .filter(Model.is_deleted == False)
+            .offset(skip)
+            .limit(limit)
+        )
+        model: List[Model] = query.all()
 
-                if payload.get("action") == "cancel":
-                    is_cancelled = True
-                    await websocket.send_json({"status": "cancelled"})
-                    break
-
-                if is_cancelled:
-                    break
-
-                model_name, messages, max_token, stream_mode = parse_payload(payload=payload)
-
-                if model_name not in ALLOWED_MODELS:
-                    await websocket.send_json({"error": "Model not allowed."})
-                    await websocket.close()
-                    return
-
-                stream = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    max_tokens=500 if max_token is None else max_token,
-                    temperature=params.model_temp,
-                    stream=True,
-                )
-
-                if stream_mode == 'token' or stream_mode is None:
-                    await response.stream_token(stream=stream)
-                elif stream_mode == 'digit':
-                    await response.stream_digit(stream=stream)
-                elif stream_mode == 'word':
-                    await response.stream_word(stream=stream)
-
-                await websocket.send_json({"text": None, "status": "done"})
-
-            except WebSocketDisconnect:
-                break  
-
-    except WebSocketDisconnect:
-        print("WebSocket disconnected")
-        await websocket.close()
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message="Fetch all model success",
+            data=model
+        )
 
     except Exception as e:
-        await websocket.send_json({"error": str(e)})
-        await websocket.close()
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
 
-def parse_payload(payload):
-    model_name = payload.get("model_name")
-    messages = payload.get("conservation")
-    max_token = payload.get("max_token")
-    stream_mode = payload.get("stream_mode")
-    return model_name, messages, max_token, stream_mode
+@model_router.get("/{model_id}", status_code=status.HTTP_200_OK, name="Get model by id")
+async def fetch_detail(model_id: int, db: db_dependency):
+    try:
+        model: Model = (
+            db.query(Model)
+            .filter(Model.id == model_id, Model.is_deleted == False)
+            .first()
+        )
 
-class Response():    
-    def __init__(self, websocket):
-        self.websocket = websocket
+        if not model:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Prompt with ID {model_id} not found.",
+            )
 
-    async def stream_token(self, stream, is_cancelled = False):
-        for chunk in stream:
-            if is_cancelled:
-                break
-            content = chunk.choices[0].delta.content
-            await self.websocket.send_json({"text": content, "status": "continue"})
-            await asyncio.sleep(DELAY_THRESHOLD)
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message=f"Fetch prompt with id {model_id} success",
+            data=model,
+        )
 
-    async def stream_digit(self, stream, is_cancelled = False):
-        buffer = ""  
-        for chunk in stream:
-            if is_cancelled:
-                break
-            content = chunk.choices[0].delta.content
-            if content:
-                buffer += content  
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
 
-                while len(buffer) >= 5:
-                    await self.websocket.send_json({"text": buffer[:5], "status": "continue"})
-                    buffer = buffer[5:]
-                    await asyncio.sleep(DELAY_THRESHOLD)
-        if buffer:
-            await self.websocket.send_json({ "text": buffer, "status": "continue" })
+@model_router.post("", status_code=status.HTTP_201_CREATED, name="Add new model")
+async def create(model_item: ModelEntity, db: db_dependency):
+    try:
+        IS_EMPTY_ENTITY = model_item.name == "" or model_item.detail_name == "" or model_item.type == ""
+        IS_UNDEFINED_ENTITY = model_item.name is None or model_item.detail_name is None or model_item.type is None
+        if IS_EMPTY_ENTITY or IS_UNDEFINED_ENTITY: 
+            return ResponseMessage(
+                code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                message="Entity error",
+                data={"error": "Model 'name' or 'detail name' cannot be empty"},
+            )
 
-    async def stream_word(self, stream, is_cancelled = False):
-        buffer = []  
-        for chunk in stream:
-            if is_cancelled:
-                break
-            content = chunk.choices[0].delta.content
-            if content:
-                buffer.extend(content.split())  
-                while len(buffer) >= 5:
-                    await self.websocket.send_json({"text": " ".join(buffer[:5]), "status": "continue"})
-                    buffer = buffer[5:]  
-                    await asyncio.sleep(DELAY_THRESHOLD)
-        if buffer:
-            await self.websocket.send_json({ "text": " ".join(buffer), "status": "continue" })
+        new_model = Model(**model_item.dict())
+
+        db.add(new_model)
+        db.commit()
+        db.refresh(new_model)
+
+        return ResponseMessage(
+            code=status.HTTP_201_CREATED,
+            message="Model created successfully",
+            data=new_model,
+        )
+
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
+
+@model_router.put("/{model_id}", status_code=status.HTTP_200_OK, name="Update model")
+async def update(model_id: int, model_item: ModelEntity, db: db_dependency):
+    try:
+        model: Model = (
+            db.query(Model)
+            .filter(Model.id == model_id, Model.is_deleted == False)
+            .first()
+        )
+
+        if not model:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Prompt with ID {prompt_id} not found.",
+            )
+
+        model.name = model_item.name
+        model.detail_name = model_item.detail_name
+        model.type = model_item.type
+        model.updated_at = datetime.now()
+
+        db.commit()
+        db.refresh(model)
+
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message="Model updated successfully",
+            data=model
+        )
+
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
+
+@model_router.delete("/{model_id}", status_code=status.HTTP_200_OK, name="Delete prompt")
+async def delete(model_id: int, db: db_dependency):
+    try:
+        model: Model = (
+            db.query(Model)
+            .filter(Model.id == model_id, Model.is_deleted == False)
+            .first()
+        )
+
+        if not model:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Model {model.name} not found.",
+            )
+        
+        model.is_deleted = True
+        db.commit()
+
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message="Model deleted successfully",
+            data=model
+        )
+
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
