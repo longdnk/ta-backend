@@ -1,6 +1,7 @@
 import uvicorn
 from param_compile import params
 from routes.role import role_router
+from routes.model import model_router
 from routes.prompt import prompt_router
 from schema.response import ResponseMessage
 from fastapi import FastAPI, status, Request
@@ -23,7 +24,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         }
     )
 
-routers = [role_router, permission_router, prompt_router]
+routers = [role_router, permission_router, prompt_router, model_router]
 
 for router in routers:
     app.include_router(router)
@@ -45,7 +46,7 @@ async def root():
 
 def run_server():
     return uvicorn.run(
-        "main:app",
+        "backend:app",
         host=params.host,
         port=params.port,
         reload=params.reload,
@@ -58,7 +59,6 @@ def run_server():
         ssl_keyfile=params.ssl_keyfile,
         ssl_certfile=params.ssl_certfile,
     )
-
 
 if __name__ == "__main__":
     run_server()
