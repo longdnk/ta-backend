@@ -29,7 +29,7 @@ jobs:
        run: docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password ${{ secrets.DOCKER_HUB_TOKEN }}
 
      - name: Push image to github
-       run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:${{ env.tab }}
+       run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:${{ env.TAG }}
 
      - name: Clear Docker token
        run: docker logout
