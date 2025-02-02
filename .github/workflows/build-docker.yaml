@@ -11,6 +11,9 @@ jobs:
      - name: Checkout
        uses: actions/checkout@v4
 
+     - name: Set current date as tag
+       run: echo "TAG=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
      - name: Create env file
        run: |
         touch .env
@@ -20,7 +23,7 @@ jobs:
         cat .env
 
      - name: Build image
-       run: docker build . -t ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:latest
+       run: docker build . -t ${{ secrets.DOCKER_HUB_USERNAME }}/service-backend:${{ env.TAG }}
 
      - name: Login Docker Hub
        run: docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password ${{ secrets.DOCKER_HUB_TOKEN }}
