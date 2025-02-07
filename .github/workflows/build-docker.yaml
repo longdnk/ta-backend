@@ -20,6 +20,7 @@ jobs:
         echo HF_TOKEN=${{ secrets.HF_TOKEN }} >> .env
         echo URL_DATABASE=${{ secrets.URL_DATABASE }} >> .env
         echo HASH_KEY=${{ secrets.HASH_KEY }} >> .env
+        echo version=1.0.0
         cat .env
 
      - name: Build image
