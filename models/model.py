@@ -26,6 +26,7 @@ class Model(Base):
             "name": self.name,
             "detail_name": self.detail_name,
             "is_deleted": self.is_deleted,
+            "type": self.type,
             "created_at": str(self.created_at),
             "updated_at": str(self.updated_at)
         }

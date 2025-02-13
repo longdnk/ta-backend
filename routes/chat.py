@@ -92,67 +92,68 @@ async def create(chat_item: ChatEntity, db: db_dependency):
             message=f"Database error: {str(e)}",
         )
 
-# @prompt_router.put("/{prompt_id}", status_code=status.HTTP_200_OK, name="Update prompt")
-# async def update(prompt_id: int, prompt_item: PromptEntity, db: db_dependency):
-#     try:
-#         prompt: Prompt = (
-#             db.query(Prompt)
-#             .filter(Prompt.id == prompt_id, Prompt.is_deleted == False)
-#             .first()
-#         )
+@chat_router.put("/{chat_id}", status_code=status.HTTP_200_OK, name="Update chat")
+async def update(chat_id: int, chat_item: ChatEntity, db: db_dependency):
+    try:
+        chat: Chat = (
+            db.query(Chat)
+            .filter(Chat.id == chat_id, Chat.is_deleted == False)
+            .first()
+        )
 
-#         if not prompt:
-#             return ResponseMessage(
-#                 code=status.HTTP_404_NOT_FOUND,
-#                 message=f"Prompt with ID {prompt_id} not found.",
-#             )
+        if not chat:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Chat with ID {chat_id} not found.",
+            )
 
-#         prompt.content = prompt_item.content
-#         prompt.updated_at = datetime.now()
+        chat.conversation = chat_item.conversation
+        chat.title = chat_item.title
+        chat.updated_at = datetime.now()
 
-#         db.commit()
-#         db.refresh(prompt)
+        db.commit()
+        db.refresh(chat)
 
-#         return ResponseMessage(
-#             code=status.HTTP_200_OK,
-#             message="Prompt updated successfully",
-#             data=prompt,
-#         )
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message="Prompt updated successfully",
+            data=chat,
+        )
 
-#     except Exception as e:
-#         db.rollback()
-#         return ResponseMessage(
-#             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             message=f"Database error: {str(e)}",
-#         )
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )
 
-# @prompt_router.delete("/{prompt_id}", status_code=status.HTTP_200_OK, name="Delete prompt")
-# async def delete(prompt_id: int, db: db_dependency):
-#     try:
-#         prompt: Prompt = (
-#             db.query(Prompt)
-#             .filter(Prompt.id == prompt_id, Prompt.is_deleted == False)
-#             .first()
-#         )
+@chat_router.delete("/{chat_id}", status_code=status.HTTP_200_OK, name="Delete prompt")
+async def delete(chat_id: int, db: db_dependency):
+    try:
+        chat: Chat = (
+            db.query(Chat)
+            .filter(Chat.id == chat_id, Chat.is_deleted == False)
+            .first()
+        )
 
-#         if not prompt:
-#             return ResponseMessage(
-#                 code=status.HTTP_404_NOT_FOUND,
-#                 message=f"Prompt with ID {prompt_id} not found.",
-#             )
-        
-#         prompt.is_deleted = True
-#         db.commit()
+        if not chat:
+            return ResponseMessage(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Chat with ID {chat_id} not found.",
+            )
 
-#         return ResponseMessage(
-#             code=status.HTTP_200_OK,
-#             message="Prompt deleted successfully",
-#             data=prompt,
-#         )
+        chat.is_deleted = True
+        db.commit()
 
-#     except Exception as e:
-#         db.rollback()
-#         return ResponseMessage(
-#             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             message=f"Database error: {str(e)}",
-#         )
+        return ResponseMessage(
+            code=status.HTTP_200_OK,
+            message="Prompt deleted successfully",
+            data=chat,
+        )
+
+    except Exception as e:
+        db.rollback()
+        return ResponseMessage(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Database error: {str(e)}",
+        )

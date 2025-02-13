@@ -60,7 +60,7 @@ async def root():
 
 def run_server():
     return uvicorn.run(
-        "backend:app",
+        "main:app",
         host=params.host,
         port=params.port,
         reload=params.reload,

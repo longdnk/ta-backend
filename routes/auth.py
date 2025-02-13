@@ -2,6 +2,8 @@ import json
 from typing import List
 from models.user import User
 from datetime import datetime
+from models.model import Model
+from models.prompt import Prompt
 from schema.user import LoginEntity
 from helper.token import create_jwt_token
 from database.database import db_dependency
@@ -28,6 +30,20 @@ async def login(auth_info: LoginEntity, db: db_dependency):
                 message=f"User with name {auth_info.user_name} not exist."
             )
 
+        # chat_ids = [
+        #     chat.id for chat in db.query(Chat).filter(Chat.user_id == user.id).all()
+        # ]
+
+        prompt_query = db.query(Prompt).filter(
+                        Model.id.in_(user.prompt_ids),
+                        Model.is_deleted == False
+                    ).all()
+
+        models_query = db.query(Model).filter(
+                        Model.id.in_(user.models),
+                        Model.is_deleted == False
+                    ).all()
+
         user.token = create_jwt_token({
             "user_name": user.user_name,
             "email": user.email,
@@ -36,6 +52,9 @@ async def login(auth_info: LoginEntity, db: db_dependency):
         })
 
         db.commit()
+
+        user.models = [item.to_dict() for item in models_query] 
+        user.prompt_ids = [item.to_dict() for item in prompt_query]
 
         return ResponseMessage(
             code=status.HTTP_200_OK,
